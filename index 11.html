@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Dice Roll Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000; /* Dark background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #rollButton {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 30px;
+            background-color: #555;
+            color: white;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            z-index: 10; /* Ensure it's on top */
+        }
+        #rollButton:active {
+            background-color: #333;
+        }
+    </style>
+</head>
+<body>
+    <button id="rollButton">Roll</button>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Three.js setup
+        let scene, camera, renderer, cube;
+        let isRolling = false;
+
+        // Possible outcomes and exact rotation angles for each face
+        const outcomes = ["NO", "MAYBE", "YES", "NEVER", "OFC"];
+        const faceAngles = [
+            { x: 0, y: 0 },                 // "NO"
+            { x: Math.PI / 2, y: 0 },       // "MAYBE"
+            { x: Math.PI, y: 0 },           // "YES"
+            { x: -Math.PI / 2, y: 0 },      // "NEVER"
+            { x: 0, y: Math.PI / 2 },       // "OFC" (Side)
+        ];
+
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true; // Enable shadow rendering
+            document.body.appendChild(renderer.domElement);
+
+            // Lighting for the dark theme
+            const ambientLight = new THREE.AmbientLight(0x404040, 1.5); // Soft light
+            scene.add(ambientLight);
+
+            const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+            pointLight.position.set(5, 5, 5);
+            pointLight.castShadow = true;
+            scene.add(pointLight);
+
+            // Cube geometry
+            const geometry = new THREE.BoxGeometry();
+            const materials = outcomes.map(text => {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 256;
+                canvas.height = 256;
+
+                // Background color
+                context.fillStyle = "#111";
+                context.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Text color and style
+                context.fillStyle = "#fff";
+                context.font = 'bold 40px Arial';
+                context.textAlign = "center";
+                context.textBaseline = "middle";
+                context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+                const texture = new THREE.CanvasTexture(canvas);
+                return new THREE.MeshStandardMaterial({ map: texture });
+            });
+
+            cube = new THREE.Mesh(geometry, materials);
+            cube.castShadow = true;
+            scene.add(cube);
+
+            // Position the camera
+            camera.position.z = 3;
+
+            // Start the animation
+            animate();
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+
+        // Roll the cube with physics-like rotation
+        function rollCube() {
+            if (isRolling) return; // Prevent multiple rolls at once
+
+            isRolling = true;
+            
+            // Choose a random face
+            const faceIndex = Math.floor(Math.random() * faceAngles.length);
+            const targetAngle = faceAngles[faceIndex];
+            console.log("Target face: ", outcomes[faceIndex]);
+
+            const duration = 2000; // 2 seconds for the roll animation
+
+            const startRotation = { x: cube.rotation.x, y: cube.rotation.y };
+            const startTime = performance.now();
+
+            function rollAnimation(time) {
+                const elapsed = time - startTime;
+                const t = Math.min(elapsed / duration, 1); // Normalize time to [0, 1]
+
+                cube.rotation.x = THREE.MathUtils.lerp(startRotation.x, targetAngle.x, t);
+                cube.rotation.y = THREE.MathUtils.lerp(startRotation.y, targetAngle.y, t);
+
+                if (t < 1) {
+                    requestAnimationFrame(rollAnimation);
+                } else {
+                    isRolling = false; // Enable rolling again
+                }
+            }
+
+            requestAnimationFrame(rollAnimation);
+        }
+
+        // Debugging to ensure the R key works
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'r' || event.key === 'R') {
+                rollCube();
+            }
+        });
+
+        // Button press for mobile (Touch support)
+        const rollButton = document.getElementById('rollButton');
+        rollButton.addEventListener('click', rollCube);
+
+        // Show the button on mobile devices
+        function detectMobile() {
+            return /Mobi|Android/i.test(navigator.userAgent);
+        }
+
+        if (detectMobile()) {
+            rollButton.style.display = 'block'; // Show the roll button on mobile
+        } else {
+            rollButton.style.display = 'none'; // Hide the roll button on desktop
+        }
+
+        // Adjust camera and renderer on window resize
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+
+        // Initialize the 3D environment
+        init();
+    </script>
+</body>
+</html>
